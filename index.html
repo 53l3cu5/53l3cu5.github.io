@@ -30,6 +30,7 @@
             <label for="entity_name" class="indent">Entity Name:</label>
             <input type="text" id="entity_name" name="entity_name" title="Leave empty if you want entities named 'Target...' otherwise put 'Room' to have an entity named 'Room Target...'">
             <br>
+            <input type="text" id="for_graph" name="for_graph" class="indent" style="display: none" readonly>
             <br>
             <br>
             <label for="zone-detection">Number of detection zones:</label>
@@ -66,15 +67,15 @@
                 <option value="8">8</option>
                 <option value="9">9</option>
                 <option value="10">10</option>
-                <!-- Ajoutez autant d'options que nécessaire -->
             </select>
             <br>
-            <textarea id="generated-text" rows="10" cols="50" style="display: block" readonly></textarea> <!-- Zone de texte pour afficher le texte généré -->
+            <textarea id="generated-yaml-text" rows="10" cols="200" style="display: none" readonly></textarea> <!-- Zone de texte pour afficher le texte généré -->
+            <textarea id="generated-graph-text" rows="10" cols="200" style="display: block" readonly></textarea> <!-- Zone de texte pour afficher le texte généré -->
             <br>
             <input type="submit" value="Generate">
         </form>
         <br>
-        <a id="download-link" style="display: none" download="LD2450.yaml">Download YAML</a> <!-- Lien de téléchargement caché -->
+        <a id="download-yaml-link" style="display: none" download="LD2450.yaml">Download YAML</a> <a id="download-graph-link" style="display: none" download="Plotly Graph.txt">Download Plotly Graph</a> <!-- Lien de téléchargement caché -->
     </main>
     <footer>
         <p>© 2024 LD2450 motion detector configuration</p>
@@ -141,10 +142,14 @@
             const devicename = document.getElementById('devicename').value;
             const friendly_name = document.getElementById('friendly_name').value;
             const entity_name = document.getElementById('entity_name').value;
+            
+            let for_graph_low = devicename.toLowerCase() + '_' + entity_name.toLowerCase();
+            for_graph_low = for_graph_low.replace(/[-\s]+/g, '_').replace(/_+/g, '_').replace(/_$/g, '');
 
             let entete = '';
             {
-            entete = `#https://github.com/53l3cu5/ESP32_LD2450
+            entete = `#Make by https://53l3cu5.github.io/
+#Origin https://github.com/53l3cu5/ESP32_LD2450
 #Inspire by https://docs.screek.io/2a
 substitutions:
   devicename: ${devicename}
@@ -348,7 +353,7 @@ number:
                 number_zone_Timeout += `
   - platform: template
     name: \${entity_name} Zone${i} Timeout
-    id: zone1_timeout
+    id: zone${i}_timeout
     min_value: 0
     max_value: 600
     mode: box
@@ -1088,28 +1093,275 @@ uart:
           }`;
             }        
             
+            let graph_deb = '';
+            {
+              graph_deb = `type: custom:plotly-graph
+title: "${friendly_name}:\_LD2450"
+refresh_interval: 2
+hours_to_show: current_day
+ha_theme: true
+layout:
+  legend:
+    'y': 8000
+    orientation: h
+  autosize: true
+  margin:
+    autoexpand: true
+    l: 50
+    r: 20
+    t: 20
+    b: 40
+  showlegend: true
+  xaxis:
+    dtick: 1000
+    gridcolor: RGBA(200,200,200,0.15)
+    zerolinecolor: RGBA(200,200,200,0.15)
+    type: number
+    fixedrange: true
+    range:
+      - -4000
+      - 4000
+  yaxis:
+    dtick: 1000
+    gridcolor: RGBA(200,200,200,0.15)
+    zerolinecolor: RGBA(200,200,200,0.15)
+    scaleanchor: x
+    scaleratio: 1
+    fixedrange: true
+    range:
+      - 8000
+      - 0
+entities:
+  - entity: ''
+    name: Person1
+    show_value: true
+    unit_of_measurement: mm
+    marker:
+      size: 12
+    line:
+      shape: spline
+      width: 5
+    x:
+      - $ex hass.states["sensor.${for_graph_low}_target1_x"].state
+    'y':
+      - $ex hass.states["sensor.${for_graph_low}_target1_y"].state
+  - entity: ''
+    name: Person2
+    show_value: true
+    unit_of_measurement: mm
+    marker:
+      size: 12
+    line:
+      shape: spline
+      width: 5
+    x:
+      - $ex hass.states["sensor.${for_graph_low}_target2_x"].state
+    'y':
+      - $ex hass.states["sensor.${for_graph_low}_target2_y"].state
+  - entity: ''
+    name: Person3
+    show_value: true
+    unit_of_measurement: mm
+    marker:
+      size: 12
+    line:
+      shape: spline
+      width: 5
+    x:
+      - $ex hass.states["sensor.${for_graph_low}_target3_x"].state
+    'y':
+      - $ex hass.states["sensor.${for_graph_low}_target3_y"].state`;
+            }
+            
+            let graph_zone = '';
+            let coul_graph_zone = ['0,250,0', '250,110,0', '0,0,250', '250,210,0', '0,150,0', '250,50,130', '0,250,0', '250,110,0', '0,0,250', '250,210,0'];
+            for (let i = 1; i <= zonesDetection; i++) {
+                graph_zone += `
+  - entity: ''
+    name: Zone${i}
+    mode: lines
+    fill: toself
+    fillcolor: >-
+      $ex hass.states["binary_sensor.${for_graph_low}_zone${i}_presence"].state == "on" ?
+      "RGBA(${coul_graph_zone[i-1]},0.4)" : "RGBA(${coul_graph_zone[i-1]},0.1)"
+    line:
+      color: RGBA(${coul_graph_zone[i-1]},0.9)
+      shape: line
+      width: 2
+    x:
+      - $ex hass.states["number.${for_graph_low}_zone${i}_x"].state*1
+      - >-
+        $ex hass.states["number.${for_graph_low}_zone${i}_x"].state*1 -
+        hass.states["number.${for_graph_low}_zone${i}_width"].state *
+        Math.cos((hass.states["number.${for_graph_low}_angle"].state)*3.1415/180)
+      - >-
+        $ex hass.states["number.${for_graph_low}_zone${i}_x"].state*1 -
+        hass.states["number.${for_graph_low}_zone${i}_width"].state *
+        Math.cos((hass.states["number.${for_graph_low}_angle"].state)*3.1415/180) +
+        hass.states["number.${for_graph_low}_zone${i}_height"].state *
+        Math.cos((hass.states["number.${for_graph_low}_angle"].state*1-90)*3.1415/180)
+      - >-
+        $ex hass.states["number.${for_graph_low}_zone${i}_x"].state*1 +
+        hass.states["number.${for_graph_low}_zone${i}_height"].state *
+        Math.cos((hass.states["number.${for_graph_low}_angle"].state*1-90)*3.1415/180)
+      - $ex hass.states["number.${for_graph_low}_zone${i}_x"].state*1
+    'y':
+      - $ex hass.states["number.${for_graph_low}_zone${i}_y"].state*1
+      - >-
+        $ex hass.states["number.${for_graph_low}_zone${i}_y"].state*1 +
+        hass.states["number.${for_graph_low}_zone${i}_width"].state *
+        Math.sin((hass.states["number.${for_graph_low}_angle"].state)*3.1415/180)
+      - >-
+        $ex hass.states["number.${for_graph_low}_zone${i}_y"].state*1 +
+        hass.states["number.${for_graph_low}_zone${i}_width"].state *
+        Math.sin((hass.states["number.${for_graph_low}_angle"].state)*3.1415/180) +
+        hass.states["number.${for_graph_low}_zone${i}_height"].state *
+        Math.sin((hass.states["number.${for_graph_low}_angle"].state*1+90)*3.1415/180)
+      - >-
+        $ex hass.states["number.${for_graph_low}_zone${i}_y"].state*1 +
+        hass.states["number.${for_graph_low}_zone${i}_height"].state *
+        Math.sin((hass.states["number.${for_graph_low}_angle"].state*1+90)*3.1415/180)
+      - $ex hass.states["number.${for_graph_low}_zone${i}_y"].state*1`;
+            }
+            
+            let graph_zone_ex = '';
+            let coul_graph_zone_ex = ['0,150,0', '250,110,0', '0,0,250', '0,150,0', '250,110,0', '0,0,250', '0,150,0', '250,110,0', '0,0,250', '0,150,0'];
+            for (let i = 1; i <= zonesExclusion; i++) {
+              graph_zone_ex += `
+  - entity: ''
+    name: Zout${i}
+    mode: lines
+    fill: toself
+    fillcolor: >-
+      $ex hass.states["switch.${for_graph_low}_zout${i}_enable"].state == "on" ?
+      hass.states["binary_sensor.${for_graph_low}_zout${i}_presence"].state == "on" ?
+      "RGBA(250,0,0,0.4)" : "RGBA(250,0,0,0.2)" : "RGBA(0,0,0,0)"
+    line:
+      color: >-
+        $ex hass.states["switch.${for_graph_low}_zout${i}_enable"].state == "on" ?
+        "RGBA(${coul_graph_zone_ex[i-1]},0.9)" : "RGBA(0,0,0,0)" 
+      width: 3
+      dash: dash
+    x:
+      - $ex hass.states["number.${for_graph_low}_zout${i}_x"].state*1
+      - >-
+        $ex hass.states["number.${for_graph_low}_zout${i}_x"].state*1 -
+        hass.states["number.${for_graph_low}_zout${i}_width"].state *
+        Math.cos((hass.states["number.${for_graph_low}_angle"].state)*3.1415/180)
+      - >-
+        $ex hass.states["number.${for_graph_low}_zout${i}_x"].state*1 -
+        hass.states["number.${for_graph_low}_zout${i}_width"].state *
+        Math.cos((hass.states["number.${for_graph_low}_angle"].state)*3.1415/180) +
+        hass.states["number.${for_graph_low}_zout${i}_height"].state *
+        Math.cos((hass.states["number.${for_graph_low}_angle"].state*1-90)*3.1415/180)
+      - >-
+        $ex hass.states["number.${for_graph_low}_zout${i}_x"].state*1 +
+        hass.states["number.${for_graph_low}_zout${i}_height"].state *
+        Math.cos((hass.states["number.${for_graph_low}_angle"].state*1-90)*3.1415/180)
+      - $ex hass.states["number.${for_graph_low}_zout${i}_x"].state*1
+    'y':
+      - $ex hass.states["number.${for_graph_low}_zout${i}_y"].state*1
+      - >-
+        $ex hass.states["number.${for_graph_low}_zout${i}_y"].state*1 +
+        hass.states["number.${for_graph_low}_zout${i}_width"].state *
+        Math.sin((hass.states["number.${for_graph_low}_angle"].state)*3.1415/180)
+      - >-
+        $ex hass.states["number.${for_graph_low}_zout${i}_y"].state*1 +
+        hass.states["number.${for_graph_low}_zout${i}_width"].state *
+        Math.sin((hass.states["number.${for_graph_low}_angle"].state)*3.1415/180) +
+        hass.states["number.${for_graph_low}_zout${i}_height"].state *
+        Math.sin((hass.states["number.${for_graph_low}_angle"].state*1+90)*3.1415/180)
+      - >-
+        $ex hass.states["number.${for_graph_low}_zout${i}_y"].state*1 +
+        hass.states["number.${for_graph_low}_zout${i}_height"].state *
+        Math.sin((hass.states["number.${for_graph_low}_angle"].state*1+90)*3.1415/180)
+      - $ex hass.states["number.${for_graph_low}_zout${i}_y"].state*1`;
+            } 
+            let graph_fin = '';
+            {
+              graph_fin += `
+  - entity: ''
+    name: Coverage
+    mode: lines
+    line:
+      width: 1
+      color: rgba(100, 100, 100, .6)
+      dash: dot
+    x:
+      - 0
+      - 1000
+      - 3700
+      - 3500
+      - 2000
+      - 0
+      - -2000
+      - -3500
+      - -3700
+      - -1000
+      - 0
+    'y':
+      - 0
+      - 500
+      - 3700
+      - 6000
+      - 7400
+      - 8000
+      - 7400
+      - 6000
+      - 3700
+      - 500
+      - 0
+raw_plotly_config: true`;
+            }
+            
+            /******** YAML **********/
             // Fusionner les textes générés
-            const finalText1 = entete + zonesDetectionText + zonesExclusionText + text_sensor_target + number_zone_Timeout + number_zone + number_zone_ex;
-            const finalText2 = binary_sensor + binary_sensor_zone + binary_sensor_zone_ex + check_zone + check_zone_ex + sensor_zone + sensor_zone_ex;
-            const finalText3 = targets + switch_leave_zone + switch_zone_ex_enable + uart + uart_template;
-            const finalText = finalText1 + finalText2 + finalText3;
+            const finalYamlText1 = entete + zonesDetectionText + zonesExclusionText + text_sensor_target + number_zone_Timeout + number_zone + number_zone_ex;
+            const finalYamlText2 = binary_sensor + binary_sensor_zone + binary_sensor_zone_ex + check_zone + check_zone_ex + sensor_zone + sensor_zone_ex;
+            const finalYamlText3 = targets + switch_leave_zone + switch_zone_ex_enable + uart + uart_template;
+            const finalYamlText = finalYamlText1 + finalYamlText2 + finalYamlText3;
 
             // Afficher le texte généré dans la zone de texte
-            const generatedTextArea = document.getElementById('generated-text');
-            generatedTextArea.textContent = finalText;
+            const generatedYamlTextArea = document.getElementById('generated-yaml-text');
+            generatedYamlTextArea.textContent = finalYamlText;
 
             // Afficher le lien de téléchargement
-            const downloadLink = document.getElementById('download-link');
-            downloadLink.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(finalText);
-            downloadLink.style.display = 'block'; // Afficher le lien
+            const downloadYamlLink = document.getElementById('download-yaml-link');
+            downloadYamlLink.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(finalYamlText);
+            downloadYamlLink.style.display = 'block'; // Afficher le lien
 
             // Mettre à jour le nom de fichier téléchargé
-            downloadLink.setAttribute('download', `LD2450.yaml`);
+            downloadYamlLink.setAttribute('download', `LD2450.yaml`);
+            
+            /******** GRAPH **********/
+             // Fusionner les textes générés
+            const finalGraphText = graph_deb + graph_zone + graph_zone_ex + graph_fin;
+
+            // Afficher le texte généré dans la zone de texte
+            const generatedGraphTextArea = document.getElementById('generated-graph-text');
+            generatedGraphTextArea.textContent = finalGraphText;
+
+            // Afficher le lien de téléchargement
+            const downloadGraphLink = document.getElementById('download-graph-link');
+            downloadGraphLink.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(finalYamlText);
+            downloadGraphLink.style.display = 'block'; // Afficher le lien
+
+            // Mettre à jour le nom de fichier téléchargé
+            downloadGraphLink.setAttribute('download', `Plotly Graph.txt`);
         });
         // Convertir le texte entré dans le premier champ en minuscules et remplacer les espaces par des tirets
         document.getElementById('devicename').addEventListener('input', function () {
             const deviceNameInput = document.getElementById('devicename');
             deviceNameInput.value = deviceNameInput.value.toLowerCase().replace(/ /g, '-');
+        });
+        document.getElementById('entity_name').addEventListener('input', function () {
+            const devicename = document.getElementById('devicename').value;
+            const friendly_name = document.getElementById('friendly_name').value;
+            const entity_name = document.getElementById('entity_name').value;
+            const forGraphInput = document.getElementById('for_graph');
+            
+            let tmp = devicename.toLowerCase() + '_' + entity_name.toLowerCase();
+            forGraphInput.value =  tmp.replace(/[-\s]+/g, '_').replace(/_+/g, '_').replace(/_$/g, '');
         });
       });
     </script>
