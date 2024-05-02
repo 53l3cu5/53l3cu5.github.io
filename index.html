@@ -520,15 +520,14 @@ script:`;
           sprintf(combined, "Curr Size: %d x %d", x_size, y_size);
           id(tips_zone${i}_conf).publish_state(combined);`;
             }
-            let check_zone_ex = `
-
-script:`;
+            let check_zone_ex = '';
             for (let i = 1; i <= zonesExclusion; i++) {
                 check_zone_ex += `
   - id: check_zout${i}_valide
     then:
       - lambda: |-
           id(tips_zone_ex${i}_conf).publish_state("Zone Exclusion ${i}");`;
+            }
             
             // Fusionner les textes générés
             const finalText1 = entete + zonesDetectionText + zonesExclusionText + text_sensor_target + number_zone_Timeout + number_zone + number_zone_ex;
