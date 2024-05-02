@@ -12,8 +12,61 @@
             content: " *";
             color: red;
         }
+        /* CSS pour l'animation du message de confirmation */
+        .copy-message {
+            position: fixed;
+            background-color: #28a745; /* Vert */
+            color: white;
+            padding: 6px 10px; /* Réduire la taille */
+            border-radius: 5px;
+            animation: fadeOut 3s ease-in-out forwards;
+            display: none;
+        }
+        .copy-button {
+            background-color: rgba(0, 123, 255, 0.5); /* Bleu transparent */
+            border: none;
+            color: white;
+            padding: 4px 8px; /* Réduire la taille */
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 12px; /* Réduire la taille du texte */
+            margin: 2px 0;
+            cursor: pointer;
+            border-radius: 5px; /* Rend les boutons plus arrondis */
+            transition: background-color 0.3s; /* Transition de couleur au survol */
+            opacity: 0.7; /* Transparence initiale */
+        }
+        .copy-button:hover {
+            background-color: rgba(0, 123, 255, 1); /* Changement de couleur au survol */
+            opacity: 1; /* Opacité au survol */
+        }
+        .generate-button {
+            background-color: #28a745; /* Vert */
+            border: none;
+            color: white;
+            padding: 8px 16px; /* Réduire la taille */
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px; /* Réduire la taille du texte */
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 10px; /* Rend les boutons plus arrondis */
+            transition: background-color 0.3s; /* Transition de couleur au survol */
+        }
+        .generate-button:hover {
+            background-color: #218838; /* Changement de couleur au survol */
+        }
+        textarea {
+            border-radius: 5px; /* Rend les coins des zones de texte plus arrondis */
+            border: 1px solid #ced4da; /* Ajoute une bordure légère */
+            padding: 10px; /* Ajoute de l'espace à l'intérieur des zones de texte */
+            resize: none; /* Empêche le redimensionnement de la zone de texte */
+            margin-bottom: 10px; /* Ajoute un espacement en bas des zones de texte */
+            font-size: 14px; /* Définit la taille de la police */
+        }
     </style>
-
 </head>
 <body>
     <header>
@@ -30,7 +83,10 @@
             <label for="entity_name" class="indent">Entity Name:</label>
             <input type="text" id="entity_name" name="entity_name" title="Leave empty if you want entities named 'Target...' otherwise put 'Room' to have an entity named 'Room Target...'">
             <br>
-            <input type="text" id="for_graph" name="for_graph" class="indent" style="display: none" readonly>
+            <input type="text" id="for_graph" name="for_graph" class="indent" style="display: block" readonly>
+            <br>
+            <label for="api-key">Encryption key (optional):</label>
+            <input type="text" id="api-key" name="api-key" onclick="this.focus();this.select()" style="width: 370px; max-width: 75vw;">
             <br>
             <br>
             <label for="zone-detection">Number of detection zones:</label>
@@ -68,18 +124,43 @@
                 <option value="9">9</option>
                 <option value="10">10</option>
             </select>
-            <br>
-            <textarea id="generated-yaml-text" rows="10" cols="200" style="display: none" readonly></textarea> <!-- Zone de texte pour afficher le texte généré -->
-            <textarea id="generated-graph-text" rows="10" cols="200" style="display: block" readonly></textarea> <!-- Zone de texte pour afficher le texte généré -->
-            <br>
-            <input type="submit" value="Generate">
+            <br><br>
+            <input type="submit" class="generate-button" value="Generate">
+            <br><br>
+            <div id="generated-zone" style="display: none; flex-direction: row;">
+                <div style="position: relative;">
+                    <label for="generated-yaml-text">YAML Text:</label>
+                    <div style="position: relative;">
+                        <textarea id="generated-yaml-text" rows="10" cols="50" style="display: block" readonly></textarea>
+                        <button class="copy-button" data-target="generated-yaml-text" style="position: absolute; top: 5px; right: 5px;">Copy</button>
+                    </div>
+                    <a id="download-yaml-link" style="display: none" download="LD2450.yaml">Download YAML</a>
+                </div>
+                <div style="position: relative;">
+                    <label for="zone-h-text">Zone.h Text:</label>
+                    <div style="position: relative;">
+                        <textarea id="zone-h-text" rows="10" cols="50" style="display: block" readonly></textarea>
+                        <button class="copy-button" data-target="zone-h-text" style="position: absolute; top: 5px; right: 5px;">Copy</button>
+                    </div>
+                    <a id="download-zone-link" style="display: none" download="zone.h">Download Zone.h</a> 
+                </div>
+                <div style="position: relative;">
+                    <label for="generated-graph-text">Plotly Graph Text:</label>
+                    <div style="position: relative;">
+                        <textarea id="generated-graph-text" rows="10" cols="50" style="display: block" readonly></textarea>
+                        <button class="copy-button" data-target="generated-graph-text" style="position: absolute; top: 5px; right: 5px;">Copy</button>
+                    </div>
+                    <a id="download-graph-link" style="display: none" download="Plotly Graph.txt">Download Plotly Graph</a> 
+                </div>
+            </div>
         </form>
         <br>
-        <a id="download-yaml-link" style="display: none" download="LD2450.yaml">Download YAML</a> <a id="download-graph-link" style="display: none" download="Plotly Graph.txt">Download Plotly Graph</a> <!-- Lien de téléchargement caché -->
     </main>
     <footer>
         <p>© 2024 LD2450 motion detector configuration</p>
     </footer>
+    <!-- Zone pour afficher le message de confirmation -->
+    <div id="copyMessage" class="copy-message"></div>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const zoneDetectionSelect = document.getElementById('zone-detection');
@@ -106,6 +187,67 @@
             // Initialiser les options de la liste déroulante dès le chargement de la page
             updateCibleQuitterZoneOptions(parseInt(zoneDetectionSelect.value));
         });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const copyButtons = document.querySelectorAll('.copy-button');
+            const generateButton = document.querySelector('.generate-button');
+            const generatedZone = document.getElementById('generated-zone');
+
+            copyButtons.forEach(function(copyButton) {
+                copyButton.addEventListener('click', function(event) {
+                    const targetId = this.getAttribute('data-target');
+                    const targetTextarea = document.getElementById(targetId);
+                    const copyMessage = document.getElementById('copyMessage');
+                    copyMessage.textContent = 'Texte copié !';
+
+                    // Positionner le message à côté du bouton cliqué
+                    const buttonRect = this.getBoundingClientRect();
+                    copyMessage.style.left = (buttonRect.right + 10) + 'px';
+                    copyMessage.style.top = (buttonRect.top + window.scrollY + 10) + 'px';
+
+                    copyMessage.style.display = 'block';
+                    // Animation CSS pour afficher le message
+                    setTimeout(function() {
+                        copyMessage.style.display = 'none';
+                    }, 3000); // Disparition du message après 3 secondes
+
+                    // Copie du texte dans le presse-papiers
+                    targetTextarea.select();
+                    document.execCommand('copy');
+                });
+            });
+
+            generateButton.addEventListener('click', function() {
+                const deviceName = document.getElementById('devicename').value;
+                const friendlyName = document.getElementById('friendly_name').value;
+                if (deviceName != '' && friendlyName != '') {
+                    generatedZone.style.display = 'flex';
+                }
+            });
+        });
+        
+      // https://stackoverflow.com/a/62362724
+      function bytesArrToBase64(arr) {
+        const abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; // base64 alphabet
+        const bin = n => n.toString(2).padStart(8,0); // convert num to 8-bit binary string
+        const l = arr.length
+        let result = '';
+
+        for(let i=0; i<=(l-1)/3; i++) {
+          let c1 = i*3+1>=l; // case when "=" is on end
+          let c2 = i*3+2>=l; // case when "=" is on end
+          let chunk = bin(arr[3*i]) + bin(c1? 0:arr[3*i+1]) + bin(c2? 0:arr[3*i+2]);
+          let r = chunk.match(/.{1,6}/g).map((x,j)=> j==3&&c2 ? '=' :(j==2&&c1 ? '=':abc[+('0b'+x)]));
+          result += r.join('');
+        }
+
+        return result;
+      }
+
+      let array = new Uint8Array(32);
+      window.crypto.getRandomValues(array);
+      document.getElementById("api-key").value = bytesArrToBase64(array);
+
     </script>
 
     <script>
@@ -128,27 +270,30 @@
                 return true;
             }
             
-        document.getElementById('config-form').addEventListener('submit', function(event) {
-            event.preventDefault();
-            
-            // Valider les champs de texte
-            if (!validateTextFields()) {
-                return; // Arrêter l'exécution si les champs ne sont pas valides
-            }
-            
-            const zonesDetection = parseInt(document.getElementById('zone-detection').value);
-            const zonesQuitter = parseInt(document.getElementById('cible-quitter-zone').value);
-            const zonesExclusion = parseInt(document.getElementById('zone-exclusion').value);
-            const devicename = document.getElementById('devicename').value;
-            const friendly_name = document.getElementById('friendly_name').value;
-            const entity_name = document.getElementById('entity_name').value;
-            
-            let for_graph_low = devicename.toLowerCase() + '_' + entity_name.toLowerCase();
-            for_graph_low = for_graph_low.replace(/[-\s]+/g, '_').replace(/_+/g, '_').replace(/_$/g, '');
+            document.getElementById('config-form').addEventListener('submit', function(event) {
+                event.preventDefault();
+                
+                // Valider les champs de texte
+                if (!validateTextFields()) {
+                    return; // Arrêter l'exécution si les champs ne sont pas valides
+                }
+                
+                const zonesDetection = parseInt(document.getElementById('zone-detection').value);
+                const zonesQuitter = parseInt(document.getElementById('cible-quitter-zone').value);
+                const zonesExclusion = parseInt(document.getElementById('zone-exclusion').value);
+                const devicename = document.getElementById('devicename').value;
+                const friendly_name = document.getElementById('friendly_name').value;
+                let entity_name = document.getElementById('entity_name').value;
+                
+                let for_graph_low = devicename.toLowerCase() + '_' + entity_name.toLowerCase();
+                for_graph_low = for_graph_low.replace(/[-\s]+/g, '_').replace(/_+/g, '_').replace(/_$/g, '');
+                if (entity_name == "") entity_name = `""`;
+                
+                const api_key = document.getElementById('api-key').value;
 
-            let entete = '';
-            {
-            entete = `#Make by https://53l3cu5.github.io/
+                let entete = '';
+                {
+                entete = `#Make on https://53l3cu5.github.io/
 #Origin https://github.com/53l3cu5/ESP32_LD2450
 #Inspire by https://docs.screek.io/2a
 substitutions:
@@ -216,7 +361,7 @@ api:
   encryption:
     # use your own encryption key plz.
     # https://esphome.io/components/api.html?#configuration-variables
-    key: "Xd8KczJ8qKVYtAjyh3zVPar7zF8pkmZeOpnHSfjOqwA="
+    key: "${api_key}"
     
 ota:
   # use your own ota password plz.
@@ -286,7 +431,8 @@ text_sensor:
             }
             let text_sensor_target = '';
             {
-            text_sensor_target = `  - platform: template
+            text_sensor_target = `
+  - platform: template
     name: \${entity_name} Any-Presence Info
     id: tips_any_presence_conf
     icon: mdi:information-outline
@@ -423,7 +569,7 @@ number:
       then:
         - script.execute: check_zone${i}_valide
   - platform: template
-    name: \${entity_name} Zone${i}Width
+    name: \${entity_name} Zone${i} Width
     id: zone${i}_width
     mode: box
     min_value: 0
@@ -883,7 +1029,7 @@ uart:
               uart_template += '\n' + Template_Gen("TemplateSwitch* zone_must_leave_enable", "zone", "_must_leave_enable", zonesQuitter);
               uart_template += `
           const int NUM_ZONES_MUST_LEAVE = ${zonesQuitter};`;
-              uart_template += '\n' + Template_Gen("TemplateSwitch* zone_ex_enable", "zone", "_ex_enable", zonesExclusion);
+              uart_template += '\n' + Template_Gen("TemplateSwitch* zone_ex_enable", "zone_ex", "_enable", zonesExclusion);
               uart_template += '\n' + Template_Gen("TemplateNumber* zone_ex_x", "zone_ex", "_x", zonesExclusion);
               uart_template += '\n' + Template_Gen("TemplateNumber* zone_ex_y", "zone_ex", "_y", zonesExclusion);
               uart_template += '\n' + Template_Gen("TemplateNumber* zone_ex_height", "zone_ex", "_height", zonesExclusion);
@@ -1092,6 +1238,90 @@ uart:
             id(init_zone_publish) = true;
           }`;
             }        
+            
+            let zone_h_text = '';
+            {
+                zone_h_text += `#include <cmath>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <iomanip>
+#include <algorithm>
+#include <cctype>
+
+struct Position {
+  int16_t x; 
+  int16_t y;
+  int speed;
+  int16_t distance_resolution;
+  bool valide;
+  bool zone_ex_enter = false;
+  float angle = 0;
+  std::basic_string<char> position = "Static";
+  std::basic_string<char> direction = "None";
+};
+struct Zone {
+  int16_t x;
+  int16_t y;
+  int16_t height;
+  int16_t width;
+  int16_t target_count = 0;
+  int16_t outside_target_count = 0;
+  bool has_target = false;
+  bool has_target_outside = false;
+};
+
+struct Pxy {
+  int16_t x; 
+  int16_t y;
+};
+
+// Définition de la fonction pour vérifier les cibles dans une zone donnée
+bool check_targets_in_zone(struct Zone &z, struct Position &t, float angle) {
+  struct Pxy p1, p2, p3, p4;
+  float d12, d14, d15, d23, d25, d34, d35, d45; 
+  float a152, a154, a253, a354, a_sum;
+  float TAU = 6.283185; // 2*PI
+  bool isInside = false;
+  
+  p1.x = z.x;
+  p1.y = z.y;
+  p2.x = z.x - z.width * cos(angle*PI/180);
+  p2.y = z.y + z.width * sin(angle*PI/180);
+  p3.x = z.x - z.width * cos(angle*PI/180) + z.height * cos((angle-90)*PI/180);
+  p3.y = z.y + z.width * sin(angle*PI/180) + z.height * sin((angle+90)*PI/180);
+  p4.x = z.x + z.height * cos((angle-90)*PI/180);
+  p4.y = z.y + z.height * sin((angle+90)*PI/180);
+  
+  d15 = sqrt(pow(p1.x-t.x,2)+pow(p1.y-t.y,2));
+  d25 = sqrt(pow(p2.x-t.x,2)+pow(p2.y-t.y,2));
+  d35 = sqrt(pow(p3.x-t.x,2)+pow(p3.y-t.y,2));
+  d45 = sqrt(pow(p4.x-t.x,2)+pow(p4.y-t.y,2));
+  d12 = sqrt(pow(p1.x-p2.x,2)+pow(p1.y-p2.y,2));
+  d14 = sqrt(pow(p1.x-p4.x,2)+pow(p1.y-p4.y,2));
+  d23 = sqrt(pow(p2.x-p3.x,2)+pow(p2.y-p3.y,2));
+  d34 = sqrt(pow(p3.x-p4.x,2)+pow(p3.y-p4.y,2));
+  
+  a152 = acos((pow(d15,2)+pow(d25,2)-pow(d12,2))/(2*d15*d25));
+  a154 = acos((pow(d15,2)+pow(d45,2)-pow(d14,2))/(2*d15*d45));
+  a253 = acos((pow(d25,2)+pow(d35,2)-pow(d23,2))/(2*d25*d35));
+  a354 = acos((pow(d35,2)+pow(d45,2)-pow(d34,2))/(2*d35*d45));
+  a_sum = a152+a154+a253+a354;
+  
+  if (a_sum>=TAU) {
+    isInside = true;
+  }
+  return isInside;
+}
+
+bool to_bool(std::basic_string<char> str) {
+    std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+    std::istringstream is(str);
+    bool b;
+    is >> std::boolalpha >> b;
+    return b;
+}`;
+            }
             
             let graph_deb = '';
             {
@@ -1324,6 +1554,7 @@ raw_plotly_config: true`;
             // Afficher le texte généré dans la zone de texte
             const generatedYamlTextArea = document.getElementById('generated-yaml-text');
             generatedYamlTextArea.textContent = finalYamlText;
+            generatedYamlTextArea.style.display = 'block'; // Afficher le texte
 
             // Afficher le lien de téléchargement
             const downloadYamlLink = document.getElementById('download-yaml-link');
@@ -1333,6 +1564,20 @@ raw_plotly_config: true`;
             // Mettre à jour le nom de fichier téléchargé
             downloadYamlLink.setAttribute('download', `LD2450.yaml`);
             
+            /******** Librairie **********/
+            // Afficher le texte généré dans la zone de texte
+            const zoneHTextArea = document.getElementById('zone-h-text');
+            zoneHTextArea.textContent = zone_h_text;
+            zoneHTextArea.style.display = 'block'; // Afficher le texte
+
+            // Afficher le lien de téléchargement
+            const zoneHLink = document.getElementById('download-zone-link');
+            zoneHLink.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(zone_h_text);
+            zoneHLink.style.display = 'block'; // Afficher le lien
+
+            // Mettre à jour le nom de fichier téléchargé
+            zoneHLink.setAttribute('download', `zone.h`);
+            
             /******** GRAPH **********/
              // Fusionner les textes générés
             const finalGraphText = graph_deb + graph_zone + graph_zone_ex + graph_fin;
@@ -1340,6 +1585,7 @@ raw_plotly_config: true`;
             // Afficher le texte généré dans la zone de texte
             const generatedGraphTextArea = document.getElementById('generated-graph-text');
             generatedGraphTextArea.textContent = finalGraphText;
+            generatedGraphTextArea.style.display = 'block'; // Afficher le texte
 
             // Afficher le lien de téléchargement
             const downloadGraphLink = document.getElementById('download-graph-link');
@@ -1348,22 +1594,22 @@ raw_plotly_config: true`;
 
             // Mettre à jour le nom de fichier téléchargé
             downloadGraphLink.setAttribute('download', `Plotly Graph.txt`);
+            });
+            // Convertir le texte entré dans le premier champ en minuscules et remplacer les espaces par des tirets
+            document.getElementById('devicename').addEventListener('input', function () {
+                const deviceNameInput = document.getElementById('devicename');
+                deviceNameInput.value = deviceNameInput.value.toLowerCase().replace(/ /g, '-');
+            });
+            document.getElementById('entity_name').addEventListener('input', function () {
+                const devicename = document.getElementById('devicename').value;
+                const friendly_name = document.getElementById('friendly_name').value;
+                const entity_name = document.getElementById('entity_name').value;
+                const forGraphInput = document.getElementById('for_graph');
+                
+                let tmp = devicename.toLowerCase() + '_' + entity_name.toLowerCase();
+                forGraphInput.value =  tmp.replace(/[-\s]+/g, '_').replace(/_+/g, '_').replace(/_$/g, '');
+            });
         });
-        // Convertir le texte entré dans le premier champ en minuscules et remplacer les espaces par des tirets
-        document.getElementById('devicename').addEventListener('input', function () {
-            const deviceNameInput = document.getElementById('devicename');
-            deviceNameInput.value = deviceNameInput.value.toLowerCase().replace(/ /g, '-');
-        });
-        document.getElementById('entity_name').addEventListener('input', function () {
-            const devicename = document.getElementById('devicename').value;
-            const friendly_name = document.getElementById('friendly_name').value;
-            const entity_name = document.getElementById('entity_name').value;
-            const forGraphInput = document.getElementById('for_graph');
-            
-            let tmp = devicename.toLowerCase() + '_' + entity_name.toLowerCase();
-            forGraphInput.value =  tmp.replace(/[-\s]+/g, '_').replace(/_+/g, '_').replace(/_$/g, '');
-        });
-      });
     </script>
 </body>
 </html>
