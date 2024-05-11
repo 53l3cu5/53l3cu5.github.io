@@ -533,7 +533,7 @@ number:
     restore_value: True
     on_value: 
       then:
-        - script.execute: check_zone${i}_valide
+        - lambda: check_zone_valid(id(zone${i}_x).state, id(zone${i}_y).state, id(zone${i}_width).state, id(zone${i}_height).state, tips_zone${i}_conf);
   - platform: template
     name: \${entity_name} Zone${i} Y
     id: zone${i}_y
@@ -550,7 +550,7 @@ number:
     restore_value: True
     on_value: 
       then:
-        - script.execute: check_zone${i}_valide
+        - lambda: check_zone_valid(id(zone${i}_x).state, id(zone${i}_y).state, id(zone${i}_width).state, id(zone${i}_height).state, tips_zone${i}_conf);
   - platform: template
     name: \${entity_name} Zone${i} Height
     id: zone${i}_height
@@ -567,7 +567,7 @@ number:
     restore_value: True
     on_value: 
       then:
-        - script.execute: check_zone${i}_valide
+        - lambda: check_zone_valid(id(zone${i}_x).state, id(zone${i}_y).state, id(zone${i}_width).state, id(zone${i}_height).state, tips_zone${i}_conf);
   - platform: template
     name: \${entity_name} Zone${i} Width
     id: zone${i}_width
@@ -584,7 +584,7 @@ number:
     restore_value: True
     on_value: 
       then:
-        - script.execute: check_zone${i}_valide`;
+        - lambda: check_zone_valid(id(zone${i}_x).state, id(zone${i}_y).state, id(zone${i}_width).state, id(zone${i}_height).state, tips_zone${i}_conf);`;
             }
             
             let number_zone_ex = '';
@@ -608,7 +608,7 @@ number:
     restore_value: True
     on_value: 
       then:
-        - script.execute: check_zout${i}_valide
+        - lambda: check_zout_valid(${i}, tips_zone_ex${i}_conf);
   - platform: template
     name: \${entity_name} Zout${i} Y
     id: zone_ex${i}_y
@@ -625,7 +625,7 @@ number:
     restore_value: True
     on_value: 
       then:
-        - script.execute: check_zout${i}_valide
+        - lambda: check_zout_valid(${i}, tips_zone_ex${i}_conf);
   - platform: template
     name: \${entity_name} Zout${i} Height
     id: zone_ex${i}_height
@@ -642,7 +642,7 @@ number:
     restore_value: True
     on_value: 
       then:
-        - script.execute: check_zout${i}_valide
+        - lambda: check_zout_valid(${i}, tips_zone_ex${i}_conf);
   - platform: template
     name: \${entity_name} Zout${i} Width
     id: zone_ex${i}_width
@@ -659,7 +659,7 @@ number:
     restore_value: True
     on_value: 
       then:
-        - script.execute: check_zout${i}_valide`;
+        - lambda: check_zout_valid(${i}, tips_zone_ex${i}_conf);`;
             }
 
             let binary_sensor = `
@@ -701,35 +701,6 @@ binary_sensor:
     id: zone_ex${i}_target_exist
     icon: mdi:account-multiple-remove
     device_class: occupancy`;
-            }
-            
-            let check_zone = `
-
-script:`;
-            for (let i = 1; i <= zonesDetection; i++) {
-                check_zone += `
-  - id: check_zone${i}_valide
-    then:
-      - lambda: |-
-          if (id(zone${i}_x).state == 0 && id(zone${i}_width).state == 0 && id(zone${i}_y).state == 0 && id(zone${i}_height).state == 0){
-            id(tips_zone${i}_conf).publish_state("Configure below");
-            return;
-          }
-
-          int x_size = id(zone${i}_width).state;
-          int y_size = id(zone${i}_height).state;
-
-          char combined[80]; 
-          sprintf(combined, "Curr Size: %d x %d", x_size, y_size);
-          id(tips_zone${i}_conf).publish_state(combined);`;
-            }
-            let check_zone_ex = '';
-            for (let i = 1; i <= zonesExclusion; i++) {
-                check_zone_ex += `
-  - id: check_zout${i}_valide
-    then:
-      - lambda: |-
-          id(tips_zone_ex${i}_conf).publish_state("Zone Exclusion ${i}");`;
             }
             
             let sensor_zone = `
@@ -1269,6 +1240,9 @@ struct Zone {
   int16_t outside_target_count = 0;
   bool has_target = false;
   bool has_target_outside = false;
+  
+  // template_::TemplateTextSensor* tips_conf;
+  // std::string name = "Zone";
 };
 
 struct Pxy {
@@ -1276,22 +1250,27 @@ struct Pxy {
   int16_t y;
 };
 
+
+float toRadians(float degrees){
+    return degrees * M_PI / 180.0;
+}
+
 // Définition de la fonction pour vérifier les cibles dans une zone donnée
 bool check_targets_in_zone(struct Zone &z, struct Position &t, float angle) {
   struct Pxy p1, p2, p3, p4;
   float d12, d14, d15, d23, d25, d34, d35, d45; 
   float a152, a154, a253, a354, a_sum;
-  float TAU = 6.283185; // 2*PI
+  float TAU = 2 * M_PI;//6.283185; // 2*PI
   bool isInside = false;
   
   p1.x = z.x;
   p1.y = z.y;
-  p2.x = z.x - z.width * cos(angle*PI/180);
-  p2.y = z.y + z.width * sin(angle*PI/180);
-  p3.x = z.x - z.width * cos(angle*PI/180) + z.height * cos((angle-90)*PI/180);
-  p3.y = z.y + z.width * sin(angle*PI/180) + z.height * sin((angle+90)*PI/180);
-  p4.x = z.x + z.height * cos((angle-90)*PI/180);
-  p4.y = z.y + z.height * sin((angle+90)*PI/180);
+  p2.x = z.x - z.width * cos(toRadians(angle));
+  p2.y = z.y + z.width * sin(toRadians(angle));
+  p3.x = z.x - z.width * cos(toRadians(angle)) + z.height * cos(toRadians(angle - 90));
+  p3.y = z.y + z.width * sin(toRadians(angle)) + z.height * sin(toRadians(angle + 90));
+  p4.x = z.x + z.height * cos(toRadians(angle - 90));;
+  p4.y = z.y + z.height * sin(toRadians(angle + 90));;
   
   d15 = sqrt(pow(p1.x-t.x,2)+pow(p1.y-t.y,2));
   d25 = sqrt(pow(p2.x-t.x,2)+pow(p2.y-t.y,2));
@@ -1320,13 +1299,30 @@ bool to_bool(std::basic_string<char> str) {
     bool b;
     is >> std::boolalpha >> b;
     return b;
+}
+
+void check_zone_valid(int x, int y, int width, int height, template_::TemplateTextSensor* tips_conf){
+    if (x == 0 && width == 0 && y == 0 && height == 0){
+        tips_conf->publish_state("Configure below");
+        return;
+    }
+
+    char combined[80]; 
+    sprintf(combined, "Curr Size: %d x %d", width, height);
+    tips_conf->publish_state(combined);
+}
+
+void check_zout_valid(int z, template_::TemplateTextSensor* tips_conf){
+    char combined[40]; 
+    sprintf(combined, "Zone Exclusion %d", z);
+    tips_conf->publish_state(combined);
 }`;
             }
             
             let graph_deb = '';
             {
               graph_deb = `type: custom:plotly-graph
-title: "${friendly_name}:\_LD2450"
+title: "${friendly_name} - LD2450"
 refresh_interval: 2
 hours_to_show: current_day
 ha_theme: true
@@ -1547,7 +1543,7 @@ raw_plotly_config: true`;
             /******** YAML **********/
             // Fusionner les textes générés
             const finalYamlText1 = entete + zonesDetectionText + zonesExclusionText + text_sensor_target + number_zone_Timeout + number_zone + number_zone_ex;
-            const finalYamlText2 = binary_sensor + binary_sensor_zone + binary_sensor_zone_ex + check_zone + check_zone_ex + sensor_zone + sensor_zone_ex;
+            const finalYamlText2 = binary_sensor + binary_sensor_zone + binary_sensor_zone_ex + sensor_zone + sensor_zone_ex;
             const finalYamlText3 = targets + switch_leave_zone + switch_zone_ex_enable + uart + uart_template;
             const finalYamlText = finalYamlText1 + finalYamlText2 + finalYamlText3;
 
